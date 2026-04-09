@@ -35,9 +35,9 @@ public:
 
     qreal damping() const { return m_damping; }
 
-    void setDamping(qreal d) {
-        if (!qFuzzyCompare(m_damping, d)) {
-            m_damping = d;
+    void setDamping(qreal damping) {
+        if (!qFuzzyCompare(m_damping, damping)) {
+            m_damping = damping;
             emit dampingChanged();
         }
     }
