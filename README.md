@@ -22,7 +22,8 @@ https://github.com/user-attachments/assets/0840f496-575c-4ca6-83a8-87bb01a85c5f
 
 > [!NOTE]
 > This repo is for the desktop shell of the caelestia dots. If you want installation instructions
-> for the entire dots, head to [the main repo](https://github.com/caelestia-dots/caelestia) instead.
+> for the entire dots, use the official
+> [`caelestia-installer`](https://github.com/local-localhost/caelestia-installer).
 
 ### Arch linux
 
