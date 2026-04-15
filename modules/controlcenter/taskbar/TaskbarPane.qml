@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Widgets
+import Caelestia
 import Caelestia.Config
 import qs.components
 import qs.components.containers
@@ -50,10 +51,30 @@ Item {
     property bool popoutActiveWindow: Config.bar.popouts.activeWindow ?? true
     property bool popoutTray: Config.bar.popouts.tray ?? true
     property bool popoutStatusIcons: Config.bar.popouts.statusIcons ?? true
+    property string environment: GlobalConfig.general.environment ?? "default"
     property list<string> monitorNames: Hypr.monitorNames()
     property list<string> excludedScreens: Config.bar.excludedScreens ?? []
+    readonly property string xdgConfigHome: Quickshell.env("XDG_CONFIG_HOME") || `${Paths.home}/.config`
+    readonly property string hyprEnvironmentConfigPath: `${Paths.config}/hypr-environment.conf`
+
+    function applyEnvironmentConfig(reload = true): void {
+        const selectedEnvironment = ["default", "kvm", "nvidia"].includes(root.environment) ? root.environment : "default";
+        const content = [
+            "# Managed by Caelestia settings.",
+            `source = ${root.xdgConfigHome}/hypr/environments/${selectedEnvironment}.conf`,
+            ""
+        ].join("\n");
+
+        if (CUtils.writeFile(Qt.resolvedUrl(root.hyprEnvironmentConfigPath), content)) {
+            if (reload)
+                Hypr.extras.message("reload");
+        } else {
+            Toaster.toast(qsTr("Failed to apply environment"), qsTr("Could not update the Hyprland environment config."), "warning");
+        }
+    }
 
     function saveConfig(entryIndex, entryEnabled) {
+        GlobalConfig.general.environment = root.environment;
         GlobalConfig.bar.activeWindow.compact = root.activeWindowCompact;
         GlobalConfig.bar.activeWindow.inverted = root.activeWindowInverted;
         GlobalConfig.bar.clock.background = root.clockBackground;
@@ -115,6 +136,8 @@ Item {
                 });
             }
         }
+
+        root.applyEnvironmentConfig(false);
     }
 
     ListModel {
@@ -783,6 +806,76 @@ Item {
                                             },
                                             state: !Strings.testRegexList(root.excludedScreens, e)
                                         }))
+                            }
+
+                            SplitButtonRow {
+                                id: environmentSelector
+
+                                function syncActiveItem(): void {
+                                    if (root.environment === "kvm") {
+                                        active = environmentKvmItem;
+                                        return;
+                                    }
+
+                                    if (root.environment === "nvidia") {
+                                        active = environmentNvidiaItem;
+                                        return;
+                                    }
+
+                                    active = environmentDefaultItem;
+                                }
+
+                                label: qsTr("Environment")
+                                menuItems: [environmentDefaultItem, environmentKvmItem, environmentNvidiaItem]
+
+                                Component.onCompleted: syncActiveItem()
+
+                                Connections {
+                                    function onEnvironmentChanged(): void {
+                                        environmentSelector.syncActiveItem();
+                                    }
+
+                                    target: root
+                                }
+
+                                MenuItem {
+                                    id: environmentDefaultItem
+
+                                    text: qsTr("Default")
+                                    icon: "desktop_windows"
+                                    activeText: qsTr("Default")
+                                    onClicked: {
+                                        root.environment = "default";
+                                        root.saveConfig();
+                                        root.applyEnvironmentConfig();
+                                    }
+                                }
+
+                                MenuItem {
+                                    id: environmentKvmItem
+
+                                    text: qsTr("KVM")
+                                    icon: "memory"
+                                    activeText: qsTr("KVM")
+                                    onClicked: {
+                                        root.environment = "kvm";
+                                        root.saveConfig();
+                                        root.applyEnvironmentConfig();
+                                    }
+                                }
+
+                                MenuItem {
+                                    id: environmentNvidiaItem
+
+                                    text: qsTr("NVIDIA")
+                                    icon: "developer_board"
+                                    activeText: qsTr("NVIDIA")
+                                    onClicked: {
+                                        root.environment = "nvidia";
+                                        root.saveConfig();
+                                        root.applyEnvironmentConfig();
+                                    }
+                                }
                             }
                         }
                     }

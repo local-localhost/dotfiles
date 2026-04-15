@@ -4,10 +4,12 @@
 #include <QtQuick/qquickitemgrabresult.h>
 #include <QtQuick/qquickwindow.h>
 #include <qdir.h>
+#include <qfile.h>
 #include <qfileinfo.h>
 #include <qfuturewatcher.h>
 #include <qloggingcategory.h>
 #include <qqmlengine.h>
+#include <qsavefile.h>
 
 Q_LOGGING_CATEGORY(lcCUtils, "caelestia.cutils", QtInfoMsg)
 
@@ -127,6 +129,38 @@ bool CUtils::deleteFile(const QUrl& path) const {
     }
 
     return QFile::remove(path.toLocalFile());
+}
+
+bool CUtils::writeFile(const QUrl& path, const QString& content) const {
+    if (!path.isLocalFile()) {
+        qCWarning(lcCUtils) << "writeFile: path" << path << "is not a local file";
+        return false;
+    }
+
+    const QString filePath = path.toLocalFile();
+    const QString parent = QFileInfo(filePath).absolutePath();
+    if (!QDir().mkpath(parent)) {
+        qCWarning(lcCUtils) << "writeFile: failed to create parent directory for" << filePath;
+        return false;
+    }
+
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+        qCWarning(lcCUtils) << "writeFile: failed to open" << filePath;
+        return false;
+    }
+
+    if (file.write(content.toUtf8()) == -1) {
+        qCWarning(lcCUtils) << "writeFile: failed to write to" << filePath;
+        return false;
+    }
+
+    if (!file.commit()) {
+        qCWarning(lcCUtils) << "writeFile: failed to commit" << filePath;
+        return false;
+    }
+
+    return true;
 }
 
 QString CUtils::toLocalFile(const QUrl& url) const {
