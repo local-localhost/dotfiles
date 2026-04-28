@@ -52,10 +52,54 @@ Item {
     property bool popoutTray: Config.bar.popouts.tray ?? true
     property bool popoutStatusIcons: Config.bar.popouts.statusIcons ?? true
     property string environment: GlobalConfig.general.environment ?? "default"
+    readonly property var nvidiaEnvironmentKeys: ["LIBVA_DRIVER_NAME", "GBM_BACKEND", "__GLX_VENDOR_LIBRARY_NAME", "NVD_BACKEND", "__GL_VRR_ALLOWED"]
     property list<string> monitorNames: Hypr.monitorNames()
     property list<string> excludedScreens: Config.bar.excludedScreens ?? []
     readonly property string xdgConfigHome: Quickshell.env("XDG_CONFIG_HOME") || `${Paths.home}/.config`
     readonly property string hyprEnvironmentConfigPath: `${Paths.config}/hypr-environment.conf`
+
+    function shellQuote(value: string): string {
+        return "'" + String(value).replace(/'/g, "'\\''") + "'";
+    }
+
+    function environmentVars(selectedEnvironment: string): var {
+        const vars = {
+            XDG_CURRENT_DESKTOP: "Hyprland",
+            XDG_SESSION_TYPE: "wayland",
+            XDG_SESSION_DESKTOP: "Hyprland"
+        };
+        const waylandDisplay = Quickshell.env("WAYLAND_DISPLAY");
+        if (waylandDisplay)
+            vars.WAYLAND_DISPLAY = waylandDisplay;
+
+        if (selectedEnvironment === "nvidia") {
+            vars.LIBVA_DRIVER_NAME = "nvidia";
+            vars.GBM_BACKEND = "nvidia-drm";
+            vars.__GLX_VENDOR_LIBRARY_NAME = "nvidia";
+            vars.NVD_BACKEND = "direct";
+            vars.__GL_VRR_ALLOWED = "0";
+        }
+
+        return vars;
+    }
+
+    function importEnvironment(selectedEnvironment: string): void {
+        const vars = root.environmentVars(selectedEnvironment);
+        const keys = Object.keys(vars);
+        const exports = keys.map(key => `export ${key}=${root.shellQuote(vars[key])}`).join("; ");
+        const clearKeys = root.nvidiaEnvironmentKeys.filter(key => !Object.prototype.hasOwnProperty.call(vars, key));
+        const clearDbus = clearKeys.map(key => `dbus-update-activation-environment --systemd ${key}= >/dev/null 2>&1 || true`).join("; ");
+        const clearSystemd = clearKeys.length > 0 ? `systemctl --user unset-environment ${clearKeys.join(" ")} >/dev/null 2>&1 || true` : "";
+        const commands = [
+            exports,
+            `dbus-update-activation-environment --systemd ${keys.join(" ")} >/dev/null 2>&1 || true`,
+            `systemctl --user import-environment ${keys.join(" ")} >/dev/null 2>&1 || true`,
+            clearSystemd,
+            clearDbus
+        ].filter(command => command.length > 0);
+
+        Quickshell.execDetached(["sh", "-c", commands.join("; ")]);
+    }
 
     function applyEnvironmentConfig(reload = true): void {
         const selectedEnvironment = ["default", "kvm", "nvidia"].includes(root.environment) ? root.environment : "default";
@@ -66,8 +110,10 @@ Item {
         ].join("\n");
 
         if (CUtils.writeFile(Qt.resolvedUrl(root.hyprEnvironmentConfigPath), content)) {
-            if (reload)
+            if (reload) {
                 Hypr.extras.message("reload");
+                root.importEnvironment(selectedEnvironment);
+            }
         } else {
             Toaster.toast(qsTr("Failed to apply environment"), qsTr("Could not update the Hyprland environment config."), "warning");
         }
