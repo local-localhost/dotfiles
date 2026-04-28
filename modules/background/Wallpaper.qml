@@ -14,8 +14,11 @@ Item {
     property string source: Wallpapers.current
     property Image current: one
     property bool completed
+    property bool loadFailed
+    readonly property bool showPlaceholder: completed && (!source || loadFailed)
 
     onSourceChanged: {
+        loadFailed = false;
         if (!source)
             current = null;
         else if (current === one)
@@ -25,18 +28,21 @@ Item {
     }
 
     Component.onCompleted: {
-        if (source)
-            Qt.callLater(() => {
+        Qt.callLater(() => {
+            if (source)
                 one.update();
-                completed = true;
-            });
+            else
+                current = null;
+
+            completed = true;
+        });
     }
 
     Loader {
         asynchronous: true
         anchors.fill: parent
 
-        active: root.completed && !root.source
+        active: root.showPlaceholder
 
         sourceComponent: StyledRect {
             color: Colours.palette.m3surfaceContainer
@@ -123,8 +129,13 @@ Item {
         scale: Wallpapers.showPreview ? 1 : 0.8
 
         onStatusChanged: {
-            if (status === Image.Ready)
+            if (status === Image.Ready) {
                 root.current = this;
+                root.loadFailed = false;
+            } else if (status === Image.Error && path === root.source) {
+                root.current = null;
+                root.loadFailed = true;
+            }
         }
 
         states: State {
