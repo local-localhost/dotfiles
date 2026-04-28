@@ -39,7 +39,7 @@ CollapsibleSection {
                         const variant = modelData.variant;
 
                         Schemes.currentVariant = variant;
-                        Quickshell.execDetached(["caelestia", "scheme", "set", "-v", variant]);
+                        M3Variants.applyVariant(variant);
 
                         Qt.callLater(() => {
                             reloadTimer.restart();

@@ -13,6 +13,11 @@ Searcher {
         return search.slice(`${GlobalConfig.launcher.actionPrefix}variant `.length);
     }
 
+    function applyVariant(variant: string): void {
+        const command = Schemes.currentScheme?.startsWith("dynamic ") ? ["caelestia", "scheme", "set", "-v", variant] : ["caelestia", "scheme", "set", "-n", "dynamic", "-v", variant];
+        Quickshell.execDetached(command);
+    }
+
     list: [
         Variant {
             variant: "vibrant"
@@ -79,7 +84,7 @@ Searcher {
 
         function onClicked(list: AppList): void {
             list.visibilities.launcher = false;
-            Quickshell.execDetached(["caelestia", "scheme", "set", "-v", variant]);
+            root.applyVariant(variant);
         }
     }
 }
